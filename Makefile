@@ -1,4 +1,4 @@
-NAME=unziplock
+NAME=rmziplock
 VERSION=0.0.1
 
 DIRS=etc lib bin sbin share
