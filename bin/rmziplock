@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Created:        Mo 2021-03-29 17:22:11 CEST
+# Last Modified:  Mo 2021-03-29 17:34:00 CEST
+#
+# rmziplock:
+#   This script removes a known password from an encrypted ZIP file.
+
+# Help text
+usage () {
+cat << EOF
+
+Usage: rmziplock [options] <file>
+
+This script removes a known password from an encrypted ZIP file.
+
+OPTIONS:
+   -o   Sets name of output file
+   -y   Overwrite existing output file
+   -h   Shows this message
+EOF
+}
+
+
+# Initialization
+YES=0
+OUTFILE=
+
+# Process options
+while getopts o:yh OPTION
+do
+    case "${OPTION}"
+        in
+        o)  OUTFILE=${OPTARG}
+            ;;
+        y)  YES=1
+            ;;
+        h)  usage
+            exit 0
+            ;;
+        \?) usage
+            exit 1
+            ;;
+    esac
+done
+
+# Skip options and shift index
+shift $((OPTIND-1))
+
+# Get commmands
+ZIP=$(command -v zip)
+UNZIP=$(command -v unzip)
+
+# Check commands
+if [ -z "$ZIP" ] || [ -z "$UNZIP" ]
+then
+    echo "Failed checking preliminaries ... cannot execute zip/unzip"
+    exit 1
+fi
+
+# Save current working directory
+CURDIR=$(pwd)
+
+# Check encrypted ZIP file
+if [ ! -f "$1" ]
+then
+    echo "File $1 does not exist"
+    exit 1
+fi
+
+# Decompose filename
+FILENAME="$1"
+FILENAME="${FILENAME%.*}"
+
+# Enter password
+echo -n "Enter password:"
+read -s PASSWORD
+echo "ok"
+
+# Create temporay folder
+TMPDIR=$(mktemp -d)
+
+# Unzip encrypted ZIP file to temporary folder
+"${UNZIP}" -P "${PASSWORD}" "$1" -d "${TMPDIR}" >/dev/null
+
+# Set filename of new ZIP file unless defined
+if [ -z "${OUTFILE}" ]
+then
+    OUTFILE="${FILENAME}_unlocked.zip"
+fi
+
+# Check if output file exists
+if [ -e "${OUTFILE}" ]
+then
+    # Check overwrite flag
+    if [ "${YES}" -eq 1 ]
+    then
+        # Remove existing output file
+        rm -f "${OUTFILE}"
+    else
+        # Error message: file exists
+        echo "${OUTFILE} already exists"
+        exit 3
+    fi
+fi
+
+# Change to temporary folder and create ZIP archive
+cd "${TMPDIR}"
+"${ZIP}" -q -r "${CURDIR}/${OUTFILE}" *
+
+# Change to working directory
+cd "${CURDIR}"
+
+# Remove temporary directory
+rm -rf "${TMPDIR}"
+
+# Test integrity of zipfile
+"${ZIP}" --test "${OUTFILE}" >/dev/null
+
+# Evaluate error code
+if [ $? -ne 0 ]
+then
+    echo "Integrity check of file ${OUTFILE} failed"
+    exit 4
+fi
