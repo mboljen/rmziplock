@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Created:        Mo 2021-03-29 17:22:11 CEST
-# Last Modified:  Mo 2021-03-29 17:34:00 CEST
+# Last Modified:  Di 2021-05-04 09:18:31 CEST
 #
 # rmziplock:
 #   This script removes a known password from an encrypted ZIP file.
@@ -15,7 +15,7 @@ Usage: rmziplock [options] <file>
 This script removes a known password from an encrypted ZIP file.
 
 OPTIONS:
-   -o   Sets name of output file
+   -o   Sets name of output file (default is suffix '_unlocked')
    -y   Overwrite existing output file
    -h   Shows this message
 EOF
@@ -73,15 +73,9 @@ FILENAME="$1"
 FILENAME="${FILENAME%.*}"
 
 # Enter password
-echo -n "Enter password:"
+echo -n "Enter password: "
 read -s PASSWORD
 echo "ok"
-
-# Create temporay folder
-TMPDIR=$(mktemp -d)
-
-# Unzip encrypted ZIP file to temporary folder
-"${UNZIP}" -P "${PASSWORD}" "$1" -d "${TMPDIR}" >/dev/null
 
 # Set filename of new ZIP file unless defined
 if [ -z "${OUTFILE}" ]
@@ -100,13 +94,39 @@ then
     else
         # Error message: file exists
         echo "${OUTFILE} already exists"
-        exit 3
+        exit 2
     fi
 fi
 
+echo -n "Extracting contents of encrypted zipfile ... "
+
+# Create temporay folder
+TMPDIR=$(mktemp -d)
+
+# Unzip encrypted ZIP file to temporary folder
+"${UNZIP}" -P "${PASSWORD}" "$1" -d "${TMPDIR}" >/dev/null
+
+if [ $? -ne 0 ]
+then
+    echo "failed (error code $?)"
+    exit 3
+else
+    echo "ok"
+fi
+
+echo -n "Creating new zipfile from extracted contents ... "
+
 # Change to temporary folder and create ZIP archive
 cd "${TMPDIR}"
-"${ZIP}" -q -r "${CURDIR}/${OUTFILE}" *
+"${ZIP}" --quiet --recurse-paths "${CURDIR}/${OUTFILE}" *
+
+if [ $? -ne 0 ]
+then
+    echo "failed (error code: $?)"
+    exit 4
+else
+    echo "ok"
+fi
 
 # Change to working directory
 cd "${CURDIR}"
@@ -114,12 +134,18 @@ cd "${CURDIR}"
 # Remove temporary directory
 rm -rf "${TMPDIR}"
 
+echo -n "Checking integrity of new zipfile ... "
+
 # Test integrity of zipfile
 "${ZIP}" --test "${OUTFILE}" >/dev/null
 
 # Evaluate error code
 if [ $? -ne 0 ]
 then
-    echo "Integrity check of file ${OUTFILE} failed"
-    exit 4
+    echo "failed (error code: $?)"
+    exit 5
+else
+    echo "ok"
 fi
+
+

@@ -36,6 +36,16 @@ $ rmziplock [options] file[.zip]
 
   Shows this help message.
 
+### Exit codes
+
++ `0` Operation successful
++ `1` Preliminary check failed
++ `2` Output file already exists
++ `3` Failed to unzip encrypted file
++ `4` Failed to create new zipfile
++ `5` Failed to check integrity of new zipfile
+
+
 ## Contributing
 
 Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
